@@ -275,6 +275,39 @@ def test_the_cli_dry_run_writes_a_repo(tmp_path, monkeypatch, capsys):
     assert f"dry run: wrote {out}/ (policy.onnx, manifest.json, README.md)\n" in capsys.readouterr().out
 
 
+def test_the_cli_dry_run_stages_a_timeline_beside_the_policy(tmp_path, monkeypatch, capsys):
+    """A stage event's performance travels with its policy, byte for byte; the manifest does not change."""
+    from mjlab_microduck.publish.cli import PublishConfig, run
+
+    policy = _tiny_policy(tmp_path / "out.onnx")
+    timeline = tmp_path / "moves.json"
+    timeline.write_text('{"timeline_version": 1, "duration_s": 20.0, "keyframes": [{"t": 0.0}]}\n')
+    monkeypatch.chdir(tmp_path)
+    assert run(PublishConfig(
+        repo="someone/microduck-swag", kind="perpetual", onnx=str(policy), slot="sitstand",
+        timeline=str(timeline), dry_run=True,
+    )) == 0
+    out = tmp_path / "publish-swag"
+    assert (out / "timeline.json").read_bytes() == timeline.read_bytes()
+    assert "timeline" not in json.loads((out / "manifest.json").read_text())
+    assert f"dry run: wrote {out}/ (policy.onnx, manifest.json, README.md, timeline.json)\n" in capsys.readouterr().out
+
+
+def test_a_timeline_that_is_not_json_is_refused_before_anything_is_built(tmp_path, monkeypatch, capsys):
+    from mjlab_microduck.publish.cli import PublishConfig, run
+
+    policy = _tiny_policy(tmp_path / "out.onnx")
+    bad = tmp_path / "moves.json"
+    bad.write_text("{nope")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exit_:
+        run(PublishConfig(repo="someone/microduck-swag", kind="perpetual", onnx=str(policy),
+                          timeline=str(bad), dry_run=True))
+    assert exit_.value.code == 2
+    assert "--timeline" in capsys.readouterr().err
+    assert not (tmp_path / "publish-swag").exists()
+
+
 def _manifest_with_training(training: dict) -> dict:
     return m.build_manifest(
         name="sprint", kind="perpetual", description="Walks fast.", slot="walk", training=training

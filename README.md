@@ -214,6 +214,10 @@ uv run publish --onnx output.onnx --repo <user>/microduck-flamingo \
 # A new gait for a slot
 uv run publish --onnx output.onnx --repo <user>/microduck-my-walk --kind perpetual --slot walk
 
+# A performance for the Arena's Swag Contest: the policy, and the timeline the Arena plays
+uv run publish --onnx output.onnx --repo <user>/microduck-my-swag --kind perpetual --slot sitstand \
+    --timeline timeline.json
+
 # See what would be uploaded without touching the Hub
 uv run publish --onnx output.onnx --repo <user>/microduck-bow --kind episodic --duration-s 4.0 --dry-run
 ```
