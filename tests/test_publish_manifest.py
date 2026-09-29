@@ -308,6 +308,23 @@ def test_a_timeline_that_is_not_json_is_refused_before_anything_is_built(tmp_pat
     assert not (tmp_path / "publish-swag").exists()
 
 
+def test_a_utf16_timeline_is_refused_like_the_arena_reads_it(tmp_path, monkeypatch, capsys):
+    """json.loads accepts bytes and sniffs UTF-16/UTF-32; the Arena reads a
+    timeline.json as strict UTF-8 text, so this must be refused the same way."""
+    from mjlab_microduck.publish.cli import PublishConfig, run
+
+    policy = _tiny_policy(tmp_path / "out.onnx")
+    bad = tmp_path / "moves.json"
+    bad.write_bytes('{"timeline_version": 1, "duration_s": 20.0, "keyframes": [{"t": 0.0}]}'.encode("utf-16"))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exit_:
+        run(PublishConfig(repo="someone/microduck-swag", kind="perpetual", onnx=str(policy),
+                          timeline=str(bad), dry_run=True))
+    assert exit_.value.code == 2
+    assert "--timeline" in capsys.readouterr().err
+    assert not (tmp_path / "publish-swag").exists()
+
+
 def _manifest_with_training(training: dict) -> dict:
     return m.build_manifest(
         name="sprint", kind="perpetual", description="Walks fast.", slot="walk", training=training

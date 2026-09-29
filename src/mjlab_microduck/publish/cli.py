@@ -257,11 +257,13 @@ def _default_name(repo: str) -> str:
 
 
 def _read_timeline(path: str) -> bytes:
-    """The --timeline file's bytes, refused unless they parse as JSON."""
+    """The --timeline file's bytes, refused unless they parse as JSON the way
+    the Arena reads them: strict UTF-8, not json.loads' own encoding sniffing
+    (which would accept a UTF-16 file the Arena refuses)."""
     try:
         data = Path(path).read_bytes()
-        json.loads(data)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
+        json.loads(data.decode("utf-8"))
+    except (OSError, ValueError, RecursionError) as e:
         _fail(f"--timeline {path}: not a readable JSON file ({e})")
     return data
 
