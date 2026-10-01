@@ -145,6 +145,34 @@ try:
 except Exception as _e:  # pragma: no cover
     print(f"[mdp] Patch 5 NOT applied ({_e!r})")
 
+# ---------------------------------------------------------------------------
+# Patch 6: viser GuiApi.add_slider — clamp a slider's bounds around its own
+# initial value. mjlab's velocity-command GUI hardcodes a "Max <axis>" slider
+# with min=0.1, so any task whose command range is narrower than that
+# (StandUp, Roulade, SitStand, ... — all the non-locomotion tasks that keep a
+# near-zero twist command only for 61D obs-shape parity) crashes the viewer
+# at setup with `AssertionError: max >= value >= min` the instant
+# `--viewer viser` tries to build the GUI, before anything is ever served.
+# Widening the bounds to include initial_value preserves every normal slider
+# unchanged and only kicks in for this degenerate case.
+# ---------------------------------------------------------------------------
+try:
+    from viser._gui_api import GuiApi as _GuiApi  # noqa: E402
+
+    _orig_add_slider = _GuiApi.add_slider
+
+    def _add_slider_safe(self, label, min, max, step, initial_value, **kwargs):
+        if initial_value < min:
+            min = initial_value
+        if initial_value > max:
+            max = initial_value
+        return _orig_add_slider(self, label, min, max, step, initial_value, **kwargs)
+
+    _GuiApi.add_slider = _add_slider_safe
+    print("[mdp] Patch 6 active: viser slider bounds clamped to their initial value")
+except Exception as _e:  # pragma: no cover
+    print(f"[mdp] Patch 6 NOT applied ({_e!r})")
+
 if TYPE_CHECKING:
     from mjlab.viewer.debug_visualizer import DebugVisualizer
 
