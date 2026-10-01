@@ -442,6 +442,12 @@ class PolicyInference:
             self.head_max = 2.5
             self.head_step = 0.83
 
+        # Scripted head gestures (no training — head_offset is already a
+        # command the standing/walking policy accepts). Runs on top of
+        # whatever policy is active; does not touch behavior_sessions.
+        self.gesture_active = None
+        self.gesture_time = 0.0
+
         # Action delay buffer
         self.use_delay = self.delay_max_lag > 0
         if self.use_delay:
@@ -843,6 +849,35 @@ class PolicyInference:
                 self.current_policy = "walking"
             self.ort_session = self.standing_session if self.current_policy == "standing" else self.walking_session
             print(f"Sit: OFF → back to {self.current_policy}")
+        self._update_command()
+
+    def trigger_gesture(self, name):
+        """Start a scripted head gesture (e.g. 'no'). One-shot, auto-ends."""
+        if self.gesture_active is not None:
+            return
+        self.gesture_active = name
+        self.gesture_time = 0.0
+        print(f"Gesture: {name}")
+
+    def update_gesture(self, dt):
+        """Advance the active gesture; writes head_offset directly (overrides
+        manual head control while running) and calls _update_command() so the
+        change reaches the policy this step."""
+        if self.gesture_active is None:
+            return
+        self.gesture_time += dt
+        if self.gesture_active == "no":
+            # 3 left-right shakes (yaw) over 1.8s, then back to centre.
+            duration, period = 1.8, 0.45
+            amp = min(0.6, self.head_max)
+            if self.gesture_time >= duration:
+                self.head_offset[2] = 0.0
+                self.gesture_active = None
+                print("Gesture: done")
+            else:
+                self.head_offset[2] = amp * math.sin(2 * math.pi * self.gesture_time / period)
+        else:
+            self.gesture_active = None
         self._update_command()
 
     def toggle_head_mode(self):
@@ -1557,6 +1592,8 @@ def main():
                 policy.trigger_behavior("kick_right")
             elif key == "r":
                 policy.trigger_behavior("roulade")
+            elif key == "n":
+                policy.trigger_gesture("no")
             elif key == "q":
                 quit_requested = True
                 print("Quit requested")
@@ -1624,6 +1661,7 @@ def main():
     print("  K:                kick with LEFT foot (requires --kick-left)")
     print("  L:                kick with RIGHT foot (requires --kick-right)")
     print("  R:                roulade / forward roll (requires --roulade)")
+    print("  N:                shake head 'no' (scripted gesture, no policy needed)")
     print(f"  P:                random push (trunk vel = {PUSH_MAX:.1f} m/s in random direction)")
     print("  Q:                quit")
     print("  [ Body pose mode — press B to toggle ]")
@@ -1678,6 +1716,7 @@ def main():
 
                 policy.update_ground_pick_phase(actual_dt)
                 policy.update_behavior(actual_dt)
+                policy.update_gesture(actual_dt)
 
                 if policy_enabled:
                     action = policy.infer()

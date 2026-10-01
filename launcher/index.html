@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microduck — Simulateur</title>
+<style>
+  :root {
+    --bg: #11151c; --panel: #171c26; --panel-2: #1f2633; --border: #2a3242;
+    --text: #e8edf5; --text-dim: #8a93a6; --accent: #ffcc33; --accent-dim: #2a2415;
+    --ok: #4ade80; --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh; padding: 32px 16px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .duck { font-size: 40px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { color: var(--text-dim); font-size: 14px; margin-top: 2px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-dim); margin: 0 0 14px; }
+  .skill {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    border-radius: 8px; background: var(--panel-2); margin-bottom: 8px;
+    cursor: pointer; border: 1px solid transparent; transition: border-color .15s;
+  }
+  .skill:hover { border-color: var(--border); }
+  .skill.required { opacity: .7; cursor: default; }
+  .skill input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .skill .meta { flex: 1; }
+  .skill .label { font-weight: 600; font-size: 14.5px; }
+  .skill .desc { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
+  .skill .tag { font-size: 10.5px; color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 5px; padding: 2px 6px; }
+  .skill .missing { color: var(--danger); font-size: 11.5px; }
+  .actions { display: flex; gap: 10px; align-items: center; }
+  button {
+    font-family: inherit; font-size: 14.5px; font-weight: 600; border: none;
+    border-radius: 9px; padding: 12px 20px; cursor: pointer; transition: transform .1s, opacity .15s;
+  }
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #launch { background: var(--accent); color: #221c05; flex: 1; }
+  #stop { background: var(--panel-2); color: var(--danger); border: 1px solid var(--border); }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); margin-bottom: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-dim); }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .cmd { font-family: 'Cascadia Code', Consolas, monospace; font-size: 11.5px; color: var(--text-dim);
+    background: #0c0f15; border-radius: 6px; padding: 8px 10px; margin-top: 10px; word-break: break-all; display: none; }
+  .legend { font-size: 12.5px; color: var(--text-dim); line-height: 1.9; }
+  .legend b { color: var(--text); }
+  footer { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="duck">🦆</div>
+    <div>
+      <h1>Simulateur Microduck</h1>
+      <div class="sub">Choisis les compétences à charger, lance la simulation</div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <h2>Compétences</h2>
+    <div id="skills"></div>
+  </div>
+
+  <div class="panel">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Vérification…</span></div>
+    <div class="actions">
+      <button id="launch">▶ Lancer la simulation</button>
+      <button id="stop">■ Arrêter</button>
+    </div>
+    <div class="cmd" id="cmd"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Une fois lancé (dans la fenêtre qui s'ouvre)</h2>
+    <div class="legend">
+      <div><b>Flèches</b> — avancer / reculer / strafe</div>
+      <div><b>A / E</b> — tourner gauche / droite</div>
+      <div><b>Espace</b> — stop (vitesse à zéro)</div>
+      <div><b>Y</b> — s'asseoir / se relever <i>(si activé)</i></div>
+      <div><b>G</b> — ramassage au sol <i>(si activé)</i></div>
+      <div><b>R</b> — roulade <i>(si activé)</i></div>
+      <div><b>K / L</b> — tir pied gauche / droit <i>(si activé)</i></div>
+      <div><b>T</b> — pause/reprise de la politique</div>
+      <div><b>Q</b> — quitter</div>
+    </div>
+  </div>
+
+  <footer>Microduck launcher — tourne en local, aucune donnée envoyée ailleurs</footer>
+</div>
+
+<script>
+const skillsEl = document.getElementById('skills');
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('statusText');
+const cmdEl = document.getElementById('cmd');
+const launchBtn = document.getElementById('launch');
+const stopBtn = document.getElementById('stop');
+
+let skillsData = [];
+
+async function loadSkills() {
+  const r = await fetch('/api/skills');
+  const data = await r.json();
+  skillsData = data.skills;
+  skillsEl.innerHTML = skillsData.map(s => `
+    <label class="skill ${s.required ? 'required' : ''}" data-id="${s.id}">
+      <input type="checkbox" ${s.required ? 'checked disabled' : 'checked'} ${!s.available ? 'disabled' : ''} data-id="${s.id}">
+      <div class="meta">
+        <div class="label">${s.label} ${s.required ? '<span class="tag">toujours actif</span>' : ''}</div>
+        <div class="desc">${s.desc}</div>
+      </div>
+      ${!s.available ? '<span class="missing">fichier manquant</span>' : ''}
+    </label>
+  `).join('');
+}
+
+function selectedSkills() {
+  return [...skillsEl.querySelectorAll('input[type=checkbox]:checked')].map(i => i.dataset.id);
+}
+
+async function refreshStatus() {
+  const r = await fetch('/api/status');
+  const data = await r.json();
+  dot.classList.toggle('on', data.running);
+  statusText.textContent = data.running ? 'Simulation en cours' : 'Arrêté';
+  stopBtn.disabled = !data.running;
+  if (data.command) {
+    cmdEl.style.display = 'block';
+    cmdEl.textContent = data.command;
+  }
+}
+
+launchBtn.addEventListener('click', async () => {
+  launchBtn.disabled = true;
+  statusText.textContent = 'Lancement…';
+  try {
+    await fetch('/api/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skills: selectedSkills() }),
+    });
+  } finally {
+    launchBtn.disabled = false;
+    setTimeout(refreshStatus, 500);
+  }
+});
+
+stopBtn.addEventListener('click', async () => {
+  await fetch('/api/stop', { method: 'POST' });
+  setTimeout(refreshStatus, 300);
+});
+
+loadSkills();
+refreshStatus();
+setInterval(refreshStatus, 2000);
+</script>
+</body>
+</html>
