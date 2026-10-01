@@ -876,6 +876,38 @@ class PolicyInference:
                 print("Gesture: done")
             else:
                 self.head_offset[2] = amp * math.sin(2 * math.pi * self.gesture_time / period)
+        elif self.gesture_active == "yes":
+            # 2 nods (pitch) over 1.2s, then back to centre.
+            duration, period = 1.2, 0.5
+            amp = min(0.5, self.head_max)
+            if self.gesture_time >= duration:
+                self.head_offset[1] = 0.0
+                self.gesture_active = None
+                print("Gesture: done")
+            else:
+                self.head_offset[1] = amp * math.sin(2 * math.pi * self.gesture_time / period)
+        elif self.gesture_active == "curious":
+            # Ease into a held tilt (pitch down + roll) for 2s, then release.
+            ease_in, hold, ease_out = 0.5, 1.5, 0.5
+            duration = ease_in + hold + ease_out
+            target_pitch, target_roll = 0.35, min(0.3, self.head_max)
+            t = self.gesture_time
+            if t >= duration:
+                self.head_offset[1] = 0.0
+                self.head_offset[3] = 0.0
+                self.gesture_active = None
+                print("Gesture: done")
+            elif t < ease_in:
+                k = t / ease_in
+                self.head_offset[1] = target_pitch * k
+                self.head_offset[3] = target_roll * k
+            elif t < ease_in + hold:
+                self.head_offset[1] = target_pitch
+                self.head_offset[3] = target_roll
+            else:
+                k = 1.0 - (t - ease_in - hold) / ease_out
+                self.head_offset[1] = target_pitch * k
+                self.head_offset[3] = target_roll * k
         else:
             self.gesture_active = None
         self._update_command()
@@ -1594,6 +1626,10 @@ def main():
                 policy.trigger_behavior("roulade")
             elif key == "n":
                 policy.trigger_gesture("no")
+            elif key == "m":
+                policy.trigger_gesture("yes")
+            elif key == "c":
+                policy.trigger_gesture("curious")
             elif key == "q":
                 quit_requested = True
                 print("Quit requested")
@@ -1662,6 +1698,8 @@ def main():
     print("  L:                kick with RIGHT foot (requires --kick-right)")
     print("  R:                roulade / forward roll (requires --roulade)")
     print("  N:                shake head 'no' (scripted gesture, no policy needed)")
+    print("  M:                nod head 'yes' (scripted gesture, no policy needed)")
+    print("  C:                curious head tilt (scripted gesture, no policy needed)")
     print(f"  P:                random push (trunk vel = {PUSH_MAX:.1f} m/s in random direction)")
     print("  Q:                quit")
     print("  [ Body pose mode — press B to toggle ]")
