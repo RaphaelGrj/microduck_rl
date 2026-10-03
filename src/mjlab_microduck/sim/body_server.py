@@ -509,6 +509,17 @@ def apply_control(world: World, path: str) -> None:
             data.qpos[qpos_adr : qpos_adr + 3] = position
             data.qpos[qpos_adr + 3 : qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
             data.qvel[dof_adr : dof_adr + 6] = 0.0
+        # `{"teleport_duck": [{"index": 0, "pos": [x, y], "yaw": rad}]}` moves a duck's trunk (height and
+        # joints kept, velocity zeroed, upright) so a long series of trials can start from the same
+        # spot instead of wandering into a wall.
+        for spec in command.get("teleport_duck") or []:
+            body = next((b for b in world.bodies if b.index == int(spec.get("index", 0))), None)
+            if body is None:
+                continue
+            yaw = float(spec.get("yaw", 0.0))
+            data.qpos[body.trunk : body.trunk + 2] = [float(v) for v in spec["pos"][:2]]
+            data.qpos[body.trunk + 3 : body.trunk + 7] = [np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)]
+            data.qvel[body.trunk_dof : body.trunk_dof + 6] = 0.0
         mujoco.mj_forward(model, data)
 
 
