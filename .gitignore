@@ -39,3 +39,4 @@ logdir/.claude/
 logdir/
 logdir/.claude/worktrees/
 launcher/*.log
+src/mjlab_microduck/robot/microduck/scene_arena_cat.xml
