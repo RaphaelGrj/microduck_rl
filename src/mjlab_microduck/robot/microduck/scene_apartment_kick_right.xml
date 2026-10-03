@@ -1,0 +1,15 @@
+<mujoco model="scene_apartment_kick_right">
+    <!-- Balle exactement a la position de depart de l'entrainement BallKick pour le pied DROIT :
+         (x=0.09, y=-0.042) dans le repere du tronc (microduck_ball_kick_env_cfg.py). Suppose le
+         canard a l'origine, cap +x. Sert a verifier qu'un tir declenche ici frappe bien la balle
+         et a mesurer ou elle apparait dans l'image. Fork-only. -->
+    <include file="scene_apartment.xml" />
+    <worldbody>
+        <body name="testball" pos="0.09 -0.042 0.035">
+            <freejoint name="testball_free" />
+            <inertial pos="0 0 0" mass="0.015" diaginertia="1.225e-5 1.225e-5 1.225e-5" />
+            <geom name="testball_geom" type="sphere" size="0.035"
+                  rgba="1 0.55 0 1" friction="0.5 0.005 0.0001" />
+        </body>
+    </worldbody>
+</mujoco>

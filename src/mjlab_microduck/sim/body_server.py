@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import socketserver
 import threading
@@ -436,6 +437,81 @@ class Server(socketserver.ThreadingTCPServer):
     daemon_threads = True
 
 
+def groundtruth_targets(world: World) -> list[tuple[str, int]]:
+    """Bodies whose world position the ground-truth tap exports (fork addition).
+
+    `DUCK_SIM_GT_BODIES` is a comma list; the default covers the balls and cubes of the apartment
+    scene and the test balls of the fork's `scene_apartment_*` files.
+    """
+    names = os.environ.get(
+        "DUCK_SIM_GT_BODIES", "testball,ball_0,ball_1,ball_2,obj_0,obj_1,obj_2,obj_3"
+    ).split(",")
+    found = []
+    for name in (n.strip() for n in names):
+        body_id = mujoco.mj_name2id(world.model, mujoco.mjtObj.mjOBJ_BODY, name)
+        if name and body_id >= 0:
+            found.append((name, int(body_id)))
+    return found
+
+
+def write_groundtruth(world: World, path: str, targets: list[tuple[str, int]]) -> None:
+    """Dump the simulator's true poses to `path` (atomically), for evaluating perception/control.
+
+    Fork addition, opt-in with `DUCK_SIM_GROUNDTRUTH=<file>`. It exists because the real robot has no
+    such thing and a behaviour built on a camera needs a ruler: where the ball REALLY is relative to
+    the trunk, and whether a kick moved it. Nothing here is visible to the daemons.
+    """
+    with world.lock:
+        data = world.data
+        ducks = [
+            {
+                "index": body.index,
+                "pos": data.qpos[body.trunk : body.trunk + 3].tolist(),
+                "quat": data.qpos[body.trunk + 3 : body.trunk + 7].tolist(),
+            }
+            for body in world.bodies
+        ]
+        bodies = {name: data.xpos[body_id].tolist() for name, body_id in targets}
+        now = float(data.time)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as handle:
+        json.dump({"t": now, "ducks": ducks, "bodies": bodies}, handle)
+    os.replace(tmp, path)
+
+
+def apply_control(world: World, path: str) -> None:
+    """Apply a one-shot command file, then delete it (fork addition, opt-in `DUCK_SIM_CONTROL`).
+
+    `{"teleport": {"testball": [x, y, z]}}` puts a free-jointed object at a world position, upright
+    and at rest. It is how an experiment resets the ball between trials after the duck has stood up
+    (a seated duck pushes a ball placed beside it away as it rises). Test tooling only: nothing on a
+    real robot can do this, and no daemon sees it.
+    """
+    try:
+        with open(path) as handle:
+            command = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return  # not there yet, or half-written: look again next time
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+    with world.lock:
+        model, data = world.model, world.data
+        for name, position in (command.get("teleport") or {}).items():
+            body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+            if body_id < 0 or model.body_jntnum[body_id] < 1:
+                continue
+            joint = int(model.body_jntadr[body_id])
+            if model.jnt_type[joint] != mujoco.mjtJoint.mjJNT_FREE:
+                continue
+            qpos_adr, dof_adr = int(model.jnt_qposadr[joint]), int(model.jnt_dofadr[joint])
+            data.qpos[qpos_adr : qpos_adr + 3] = position
+            data.qpos[qpos_adr + 3 : qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
+            data.qvel[dof_adr : dof_adr + 6] = 0.0
+        mujoco.mj_forward(model, data)
+
+
 def run(world: World, headless: bool) -> None:
     """Step in real time.
 
@@ -468,6 +544,15 @@ def run(world: World, headless: bool) -> None:
     # The cameras, at their own rate — slower than the viewer and far slower than physics.
     eyes = [b for b in world.bodies if b.camera is not None]
     passes_per_eye = max(1, round((1.0 / CAMERA_FPS) / period))
+    # Ground-truth tap (fork addition, opt-in): true trunk/object poses every 0.1 s of world time.
+    gt_path = os.environ.get("DUCK_SIM_GROUNDTRUTH", "")
+    gt_targets = groundtruth_targets(world) if gt_path else []
+    passes_per_gt = max(1, round(0.1 / period))
+    control_path = os.environ.get("DUCK_SIM_CONTROL", "")
+    if control_path:
+        print(f"== control file {control_path} (teleport objects)", flush=True)
+    if gt_path:
+        print(f"== ground truth -> {gt_path} ({[n for n, _ in gt_targets]})", flush=True)
     step = 0
     next_step = time.perf_counter()
     behind = 0
@@ -492,6 +577,10 @@ def run(world: World, headless: bool) -> None:
             step += 1
             if viewer is not None and step % passes_per_frame == 0:
                 viewer.sync()
+            if gt_path and step % passes_per_gt == 0:
+                write_groundtruth(world, gt_path, gt_targets)
+            if control_path and step % 5 == 0 and os.path.exists(control_path):
+                apply_control(world, control_path)
             if eyes and step % passes_per_eye == 0:
                 for body in eyes:
                     if body.camera is not None:

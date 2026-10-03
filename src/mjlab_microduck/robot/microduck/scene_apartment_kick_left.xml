@@ -1,10 +1,8 @@
-<mujoco model="scene_apartment_testball">
-    <!-- Appartement + la balle d'entrainement de BallKick (ball.xml : 70 mm, 15 g, orange, memes
-         frottements) posee a 40 cm devant le canard (il demarre en 0,0 face a +x). Sert a
-         developper l'approche vision. Fork-only. -->
+<mujoco model="scene_apartment_kick_left">
+    <!-- Idem scene_apartment_kick_right.xml pour le pied GAUCHE : balle en (x=0.09, y=+0.042). -->
     <include file="scene_apartment.xml" />
     <worldbody>
-        <body name="testball" pos="0.40 0.0 0.035">
+        <body name="testball" pos="0.09 0.042 0.035">
             <freejoint name="testball_free" />
             <inertial pos="0 0 0" mass="0.015" diaginertia="1.225e-5 1.225e-5 1.225e-5" />
             <geom name="testball_geom" type="sphere" size="0.035"
