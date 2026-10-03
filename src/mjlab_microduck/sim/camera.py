@@ -15,6 +15,7 @@ cameras at 15 fps is most of a core; four without is nothing. Most sessions do n
 
 from __future__ import annotations
 
+import os
 import socket
 import socketserver
 import struct
@@ -30,7 +31,14 @@ HEIGHT = 360
 
 # The sensor's rate is 30, but a rendered frame costs 12 ms and a duck that is being watched is
 # usually being watched rather than raced. 15 halves the cost for something nobody can see.
-FPS = 15
+# DUCK_SIM_CAMERA_FPS overrides it (fork addition): on a machine with no GPU-backed OpenGL (WSL2
+# renders with llvmpipe, ~140 ms a frame with shadows) 15 fps starves the physics loop.
+FPS = int(os.environ.get("DUCK_SIM_CAMERA_FPS", "15"))
+
+# DUCK_SIM_CAMERA_FLAT=1 (fork addition) renders without shadows and reflections: ~4x cheaper in
+# software GL (142 -> 36 ms measured on WSL2/llvmpipe, 640x360) and irrelevant to colour
+# detection. Off by default, so the official look is untouched.
+FLAT = os.environ.get("DUCK_SIM_CAMERA_FLAT", "") not in ("", "0")
 
 # BT.601, the same coefficients `duck_detect`'s one-pass sampler uses on the robot.
 _Y = np.array([0.299, 0.587, 0.114])
@@ -111,6 +119,10 @@ class Camera:
         """
         with world.lock:
             self.renderer.update_scene(world.data, camera=self.camera)
+        if FLAT:
+            flags = self.renderer.scene.flags
+            flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+            flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
         packed = to_uyvy(self.renderer.render())
         with self.lock:
             self.latest = packed

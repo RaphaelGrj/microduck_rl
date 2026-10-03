@@ -1,0 +1,13 @@
+<mujoco model="scene_apartment_testball">
+    <!-- Appartement + une balle orange de 80 mm posee a 40 cm devant le canard (il demarre en 0,0
+         face a +x). Sert a developper et tester les detecteurs de la camera simulee. Les balles de
+         apartment.xml sont loin ou masquees par les murs au depart. Fork-only (pas dans l'amont). -->
+    <include file="scene_apartment.xml" />
+    <worldbody>
+        <body name="testball" pos="0.40 0.0 0.04">
+            <freejoint name="testball_free" />
+            <geom name="testball_geom" type="sphere" size="0.04" mass="0.02"
+                  rgba="0.96 0.46 0.04 1" friction="0.8 0.01 0.001" />
+        </body>
+    </worldbody>
+</mujoco>
