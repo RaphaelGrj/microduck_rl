@@ -3,6 +3,9 @@
          frottements) posee a 40 cm devant le canard (il demarre en 0,0 face a +x). Sert a
          developper l'approche vision. Fork-only. -->
     <include file="scene_apartment.xml" />
+    <!-- Plan de coupe proche de la camera a ~0,6 cm (comme une vraie camera). Par defaut il vaut 1 % de l'etendue du
+         modele : 14 cm dans l'appartement, et la balle disparait des qu'elle arrive au pied du canard. -->
+    <visual><map znear="0.0004" /></visual>
     <worldbody>
         <body name="testball" pos="0.40 0.0 0.035">
             <freejoint name="testball_free" />

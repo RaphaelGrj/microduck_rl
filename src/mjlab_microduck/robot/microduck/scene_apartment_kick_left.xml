@@ -1,6 +1,9 @@
 <mujoco model="scene_apartment_kick_left">
     <!-- Idem scene_apartment_kick_right.xml pour le pied GAUCHE : balle en (x=0.09, y=+0.042). -->
     <include file="scene_apartment.xml" />
+    <!-- Plan de coupe proche de la camera a ~0,6 cm (comme une vraie camera). Par defaut il vaut 1 % de l'etendue du
+         modele : 14 cm dans l'appartement, et la balle disparait des qu'elle arrive au pied du canard. -->
+    <visual><map znear="0.0004" /></visual>
     <worldbody>
         <body name="testball" pos="0.09 0.042 0.035">
             <freejoint name="testball_free" />
