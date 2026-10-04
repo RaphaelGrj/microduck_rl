@@ -518,7 +518,18 @@ def apply_control(world: World, path: str) -> None:
                 continue
             yaw = float(spec.get("yaw", 0.0))
             data.qpos[body.trunk : body.trunk + 2] = [float(v) for v in spec["pos"][:2]]
-            data.qpos[body.trunk + 3 : body.trunk + 7] = [np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)]
+            # Optional "pitch"/"roll" (rad) and "z" (m) lay the duck down to test getting up: pitch +pi/2 is face-down.
+            # Orientation = yaw (z) then pitch (y) then roll (x), as a quaternion product.
+            pitch, roll = float(spec.get("pitch", 0.0)), float(spec.get("roll", 0.0))
+            qz = np.array([np.cos(yaw / 2), 0.0, 0.0, np.sin(yaw / 2)])
+            qy = np.array([np.cos(pitch / 2), 0.0, np.sin(pitch / 2), 0.0])
+            qx = np.array([np.cos(roll / 2), np.sin(roll / 2), 0.0, 0.0])
+            q = np.zeros(4)
+            mujoco.mju_mulQuat(q, qz, qy)
+            mujoco.mju_mulQuat(q, q.copy(), qx)
+            data.qpos[body.trunk + 3 : body.trunk + 7] = q
+            if "z" in spec:
+                data.qpos[body.trunk + 2] = float(spec["z"])
             data.qvel[body.trunk_dof : body.trunk_dof + 6] = 0.0
         mujoco.mj_forward(model, data)
 
