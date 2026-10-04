@@ -5972,7 +5972,9 @@ def reset_ball_in_front_of_foot(
 
     n = len(env_ids)
     off = torch.tensor(offset, device=env.device, dtype=torch.float).repeat(n, 1)
-    off += (torch.rand(n, 2, device=env.device) * 2.0 - 1.0) * noise_xy
+    # noise_xy: float (same ± on both axes) or (nx, ny) per-axis ± range.
+    noise = torch.as_tensor(noise_xy, device=env.device, dtype=torch.float)
+    off += (torch.rand(n, 2, device=env.device) * 2.0 - 1.0) * noise
 
     pose = torch.zeros(n, 7, device=env.device)
     pose[:, 0] = root[:, 0] + cos_y * off[:, 0] - sin_y * off[:, 1]

@@ -132,11 +132,15 @@ from mjlab_microduck.tasks.symmetry import PpoWithSymmetryCfg, SYMMETRY_CFG
 def make_microduck_ball_kick_env_cfg(
     play: bool = False,
     kick_foot: str | None = None,
+    ball_offset_x: float = BALL_OFFSET_X,
+    ball_noise_xy: float | tuple = BALL_POS_NOISE_XY,
 ) -> ManagerBasedRlEnvCfg:
     """Create the Microduck BallKick environment configuration.
 
     ``kick_foot`` overrides the module-level KICK_FOOT flag (used by tests);
     normal training just sets the flag at the top of this file.
+    ``ball_offset_x`` / ``ball_noise_xy`` (float or per-axis (nx, ny)) widen the
+    placement DR for the "tolerant" variant (fork, see TOLERANT_* below).
     """
     kick_foot = kick_foot or KICK_FOOT
     assert kick_foot in ("right", "left")
@@ -456,8 +460,8 @@ def make_microduck_ball_kick_env_cfg(
         func=microduck_mdp.reset_ball_in_front_of_foot,
         mode="reset",
         params={
-            "offset":      (BALL_OFFSET_X, ball_offset_y),
-            "noise_xy":    BALL_POS_NOISE_XY,
+            "offset":      (ball_offset_x, ball_offset_y),
+            "noise_xy":    ball_noise_xy,
             "ball_radius": BALL_RADIUS,
             "asset_name":  "ball",
         },
@@ -659,3 +663,22 @@ MicroduckBallKickRlCfg = RslRlOnPolicyRunnerCfg(
     num_steps_per_env=24,
     max_iterations=10_000,
 )
+
+
+# ── Fork: "tolerant" kick (wide ball-placement DR) ────────────────────────────
+# Measured with the official policies in duck-sim (microduck-brain kick_sweep.py):
+# the useful window is only ~3-4 cm deep and lies inside the feet's stepping
+# zone, so the last approach step pushes the ball away. This variant trains the
+# same blind policy (61D contract kept, still triggered by robot.do) on a ball
+# placed 8 to 15 cm ahead and ±2.5 cm sideways, so the brain can stop farther.
+TOLERANT_BALL_OFFSET_X = 0.115
+TOLERANT_BALL_NOISE_XY = (0.035, 0.025)
+TOLERANT_MAX_ITERATIONS = 3_000
+
+
+def make_tolerant_kick_rl_cfg(kick_foot: str) -> RslRlOnPolicyRunnerCfg:
+    rl = deepcopy(MicroduckBallKickRlCfg)
+    rl.experiment_name = f"ball_kick_tol_{kick_foot}"
+    rl.run_name = f"ball_kick_tol_{kick_foot}"
+    rl.max_iterations = TOLERANT_MAX_ITERATIONS
+    return rl

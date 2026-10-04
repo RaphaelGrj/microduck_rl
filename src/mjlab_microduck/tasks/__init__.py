@@ -278,3 +278,26 @@ for _task_id, _make_cfg, _kw, _rl_cfg, _robot_cfg in _BACKLASH_TASKS:
         rl_cfg=_rl_cfg,
         runner_cls=MicroduckOnPolicyRunner,
     )
+
+# Fork: "tolerant" kicks — wide ball-placement DR (see microduck_ball_kick_env_cfg).
+from .microduck_ball_kick_env_cfg import (
+    TOLERANT_BALL_NOISE_XY,
+    TOLERANT_BALL_OFFSET_X,
+    make_tolerant_kick_rl_cfg,
+)
+
+for _foot, _suffix in (("right", "Right"), ("left", "Left")):
+    _kw = {
+        "kick_foot": _foot,
+        "ball_offset_x": TOLERANT_BALL_OFFSET_X,
+        "ball_noise_xy": TOLERANT_BALL_NOISE_XY,
+    }
+    register_mjlab_task(
+        task_id=f"Mjlab-BallKickTolerant-Flat-Backlash-MicroDuck-{_suffix}",
+        env_cfg=make_backlash_variant(make_microduck_ball_kick_env_cfg(**_kw), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(
+            make_microduck_ball_kick_env_cfg(play=True, **_kw), _BL_GROUNDCONTACT
+        ),
+        rl_cfg=make_tolerant_kick_rl_cfg(_foot),
+        runner_cls=MicroduckOnPolicyRunner,
+    )
