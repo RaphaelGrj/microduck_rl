@@ -134,6 +134,8 @@ def make_microduck_ball_kick_env_cfg(
     kick_foot: str | None = None,
     ball_offset_x: float = BALL_OFFSET_X,
     ball_noise_xy: float | tuple = BALL_POS_NOISE_XY,
+    ball_target_speed: float = BALL_TARGET_SPEED,
+    overshoot_weight: float = -4.0,
 ) -> ManagerBasedRlEnvCfg:
     """Create the Microduck BallKick environment configuration.
 
@@ -242,12 +244,12 @@ def make_microduck_ball_kick_env_cfg(
     cfg.rewards["ball_forward_velocity"] = RewardTermCfg(
         func=microduck_mdp.ball_forward_velocity,
         weight=12.0,
-        params={"asset_name": "ball", "max_speed": BALL_TARGET_SPEED},
+        params={"asset_name": "ball", "max_speed": ball_target_speed},
     )
     cfg.rewards["ball_speed_overshoot"] = RewardTermCfg(
         func=microduck_mdp.ball_speed_overshoot_penalty,
-        weight=-4.0,
-        params={"asset_name": "ball", "target_speed": BALL_TARGET_SPEED},
+        weight=overshoot_weight,
+        params={"asset_name": "ball", "target_speed": ball_target_speed},
     )
 
     # Support foot: binary +1 while the non-kicking foot touches the ground.
@@ -676,9 +678,19 @@ TOLERANT_BALL_NOISE_XY = (0.035, 0.025)
 TOLERANT_MAX_ITERATIONS = 3_000
 
 
-def make_tolerant_kick_rl_cfg(kick_foot: str) -> RslRlOnPolicyRunnerCfg:
+def make_tolerant_kick_rl_cfg(kick_foot: str, prefix: str = "ball_kick_tol") -> RslRlOnPolicyRunnerCfg:
     rl = deepcopy(MicroduckBallKickRlCfg)
-    rl.experiment_name = f"ball_kick_tol_{kick_foot}"
-    rl.run_name = f"ball_kick_tol_{kick_foot}"
+    rl.experiment_name = f"{prefix}_{kick_foot}"
+    rl.run_name = f"{prefix}_{kick_foot}"
     rl.max_iterations = TOLERANT_MAX_ITERATIONS
     return rl
+
+
+# ── Fork: "passe" (gentle pass to the cat / a person) ─────────────────────────
+# Same wide placement DR as the tolerant kick, much lower target speed. With the
+# default weights (+12 capped, -4 overshoot) the tolerant kick at iter 1250
+# struck at 1.5-2.9 m/s for a 1.0 target: per step, reward stays positive up to
+# v = T * (1 + 12/4) and a harder kick rolls longer. Here the overshoot slope is
+# -10: net per-step reward reaches 0 at v = T * (1 + 12/10) = 1.1 m/s.
+PASSE_TARGET_SPEED = 0.5
+PASSE_OVERSHOOT_WEIGHT = -10.0

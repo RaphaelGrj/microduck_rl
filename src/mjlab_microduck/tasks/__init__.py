@@ -281,6 +281,8 @@ for _task_id, _make_cfg, _kw, _rl_cfg, _robot_cfg in _BACKLASH_TASKS:
 
 # Fork: "tolerant" kicks — wide ball-placement DR (see microduck_ball_kick_env_cfg).
 from .microduck_ball_kick_env_cfg import (
+    PASSE_OVERSHOOT_WEIGHT,
+    PASSE_TARGET_SPEED,
     TOLERANT_BALL_NOISE_XY,
     TOLERANT_BALL_OFFSET_X,
     make_tolerant_kick_rl_cfg,
@@ -299,5 +301,16 @@ for _foot, _suffix in (("right", "Right"), ("left", "Left")):
             make_microduck_ball_kick_env_cfg(play=True, **_kw), _BL_GROUNDCONTACT
         ),
         rl_cfg=make_tolerant_kick_rl_cfg(_foot),
+        runner_cls=MicroduckOnPolicyRunner,
+    )
+    # "passe" : meme placement large, tir doux (voir PASSE_* dans microduck_ball_kick_env_cfg)
+    _kw_passe = {**_kw, "ball_target_speed": PASSE_TARGET_SPEED, "overshoot_weight": PASSE_OVERSHOOT_WEIGHT}
+    register_mjlab_task(
+        task_id=f"Mjlab-BallKickPasse-Flat-Backlash-MicroDuck-{_suffix}",
+        env_cfg=make_backlash_variant(make_microduck_ball_kick_env_cfg(**_kw_passe), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(
+            make_microduck_ball_kick_env_cfg(play=True, **_kw_passe), _BL_GROUNDCONTACT
+        ),
+        rl_cfg=make_tolerant_kick_rl_cfg(_foot, prefix="ball_kick_passe"),
         runner_cls=MicroduckOnPolicyRunner,
     )
