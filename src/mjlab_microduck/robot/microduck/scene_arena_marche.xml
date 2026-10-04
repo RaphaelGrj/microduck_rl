@@ -1,0 +1,65 @@
+<mujoco model="scene_arena_marche">
+    <!-- Arene avec une ESTRADE de 15 cm : le canard demarre dessus en (0, 0) face a +x, le bord est a 0,60 m devant.
+         Sert a verifier la detection de vide du ToF (microduck-brain/tof.py, diag_vide.py) : robotd n'a aucune
+         protection contre les chutes. Balle rangee loin, au sol. Keyframes de scene_arena_testball.xml remontees
+         de 15 cm. Fork-only. -->
+    <include file="robot_allcollisions.xml" />
+
+    <visual>
+        <map znear="0.0004" />
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+        <rgba haze="0.15 0.25 0.35 1" />
+        <global azimuth="160" elevation="-20" />
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512"
+            height="3072" />
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.55 0.52 0.45"
+            rgb2="0.42 0.40 0.35" markrgb="0.8 0.8 0.8" width="300" height="300" />
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="12 12"
+            reflectance="0.0" />
+    </asset>
+
+    <worldbody>
+        <light pos="0 0 3.5" dir="0 0 -1" directional="true" />
+        <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
+        <geom name="estrade" type="box" size="1.0 1.0 0.075" pos="-0.40 0 0.075" rgba="0.62 0.58 0.50 1" />
+        <body name="testball" pos="3.0 3.0 0.035">
+            <freejoint name="testball_free" />
+            <inertial pos="0 0 0" mass="0.015" diaginertia="1.225e-5 1.225e-5 1.225e-5" />
+            <geom name="testball_geom" type="sphere" size="0.035"
+                  rgba="1 0.55 0 1" friction="0.5 0.005 0.0001" />
+        </body>
+    </worldbody>
+    <keyframe>
+        <key name="INIT" qpos="0 0 0.27 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0" ctrl="0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+        <key name="STAND" qpos="
+        0 0 0.27 1 0 0 0
+
+        0 -0.08726646259971647 -0.457924 -0.004940 0.452984
+        0.3490658503988659 0.3490658503988659 0 0
+        0 0.08726646259971647 0.457924 0.004940 -0.452984"
+         ctrl="
+        0 -0.08726646259971647 -0.457924 -0.004940 0.452984
+        0.3490658503988659 0.3490658503988659 0 0
+        0 0.08726646259971647 0.457924 0.004940 -0.452984"
+        />
+        <key name="SIT" qpos="
+        0 0 0.22 1 0 0 0
+        0 0 -0.5236 1.0472
+        0 0.5 1.6 0
+        0 0 0 0.5236 -1.0472 0" ctrl="
+        0 0 -0.5236 1.0472 0
+        0.5 1.6 0 0 0
+        0 0.5236 -1.0472 0"/>
+        <key name="FOLD" qpos="
+        0 0 0.22 1 0 0 0
+        0 0 1.57 1.57 0
+        1 1 0 0 0
+        0 -1.57 -1.57 0" ctrl="
+        0 0 1.57 1.57 0
+        1 1 0 0
+        0 0 -1.57 -1.57 0"/>
+    </keyframe>
+</mujoco>
