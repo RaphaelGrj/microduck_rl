@@ -1,5 +1,46 @@
 # Microduck RL
 
+> ## Ce fork (RaphaelGrj)
+>
+> Fork de [pollen-robotics/microduck_rl](https://github.com/pollen-robotics/microduck_rl), suivi régulièrement (remote
+> `upstream`). Il ajoute au dépôt officiel ce dont le projet [microduck-project](https://github.com/RaphaelGrj/microduck-project)
+> a besoin : un jeu de balle qui **voit** la balle, et un simulateur outillé pour valider le cerveau
+> [microduck-brain](https://github.com/RaphaelGrj/microduck-brain) avant la livraison du robot. Le reste de ce README
+> est celui de l'amont, inchangé.
+>
+> **Nouvelles tâches d'entraînement** (`tasks/__init__.py`, `microduck_ball_kick_env_cfg.py`) :
+> - `Mjlab-BallKickTolerant-Flat-Backlash-MicroDuck-Right/Left` : tir tolérant au placement. La balle peut être entre
+>   8 et 15 cm devant et à ±2,5 cm sur le côté, là où le tir officiel attend une position fixe. Pied droit entraîné
+>   (26/36 au balayage contre 14/36 pour l'officiel) ; pied gauche en cours.
+> - `Mjlab-BallKickPasse-Flat-Backlash-MicroDuck-Right/Left` : passe douce (balle visée à 0,5 m/s, dépassement
+>   pénalisé), pour jouer avec le chat ou une personne.
+>
+> **`duck-sim` outillé pour les tests** (`sim/body_server.py`, `sim/camera.py`) :
+> - `DUCK_SIM_GROUNDTRUTH` : poses réelles du canard et des objets dans `~/.cache/duck-sim/groundtruth.json`. Sert
+>   uniquement à **mesurer** ; le cerveau ne décide qu'avec ses capteurs.
+> - `DUCK_SIM_CONTROL` : téléporter la balle ou le canard (y compris couché, pour tester le relèvement).
+> - `DUCK_SIM_CAMERA_FLAT` / `DUCK_SIM_CAMERA_FPS` : rendu simplifié, environ 4 fois plus rapide sous WSL2, pour rester
+>   en temps réel.
+>
+> **Scènes de test** (`robot/microduck/scene_*.xml`) :
+> - `arena_testball` : sol plan, sans murs, avec la balle d'entraînement ;
+> - `arena_marche` : une estrade de 15 cm, pour vérifier que le canard voit le vide ;
+> - `apartment_testball`, `apartment_kick_left/right` : l'appartement avec une balle.
+>
+> Le plan de coupe de la caméra est ramené à 0,6 cm : avec la valeur par défaut, MuJoCo ne dessinait aucun objet à
+> moins de 14 cm de la caméra.
+>
+> **Correctifs et outils** :
+> - Patch 6 de `mdp.py` : corrige le plantage du viewer `viser` sur les tâches à vitesse quasi nulle (StandUp,
+>   Roulade, SitStand…).
+> - `scripts/eval_standup.py` : évaluation chiffrée du relèvement par position de départ.
+> - `scripts/infer_policy.py` : gestes scriptés sans entraînement, touches **N** (non), **M** (oui) et **C**
+>   (curieux).
+> - `launcher/` : petite interface web locale pour lancer `infer_policy.py`.
+> - `watch_viewer.sh` : relance le viewer à chaque nouveau checkpoint.
+>
+> La scène `scene_arena_cat.xml`, générée à partir d'une photo du chat, reste hors du dépôt (données personnelles).
+
 <img width="2215" height="884" alt="image" src="https://github.com/user-attachments/assets/5db7cc83-b3ce-4f7c-83f0-0572a63baed7" />
 
 
