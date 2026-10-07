@@ -40,3 +40,6 @@ logdir/
 logdir/.claude/worktrees/
 launcher/*.log
 src/mjlab_microduck/robot/microduck/scene_arena_cat.xml
+
+# genere par microduck-brain/plan_vers_mjcf.py (plan de la maison de l utilisateur, prive)
+src/mjlab_microduck/robot/microduck/scene_maison.xml
