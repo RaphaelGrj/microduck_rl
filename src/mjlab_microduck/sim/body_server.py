@@ -178,6 +178,7 @@ class World:
 
     def __init__(self, scene: Path, count: int = 1):
         self.model = build_world(scene, count)
+        self.scene_name = scene.name              # in the ground-truth file: the AR twin knows a house-plan scene
         self.model.opt.timestep = TIMESTEP
         self.data = mujoco.MjData(self.model)
         self.lock = threading.Lock()
@@ -243,6 +244,13 @@ class Body:
         self.camera: Camera | None = None
         self.trunk = int(model.jnt_qposadr[ident(mujoco.mjtObj.mjOBJ_JOINT, "trunk_base_freejoint")])
         self.trunk_dof = int(model.jnt_dofadr[ident(mujoco.mjtObj.mjOBJ_JOINT, "trunk_base_freejoint")])
+        # Every rigid part of this duck, by its unprefixed name (fork addition, for the ground-truth tap's AR twin).
+        root = ident(mujoco.mjtObj.mjOBJ_BODY, "trunk_base")
+        self.parts = [
+            (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, b)[len(self.prefix):], b)
+            for b in range(model.nbody)
+            if model.body_rootid[b] == model.body_rootid[root]
+        ]
 
         self.actuator_slice = np.array(self.actuators)
         self._gain = model.actuator_gainprm[self.actuator_slice, 0].copy()
@@ -468,6 +476,12 @@ def write_groundtruth(world: World, path: str, targets: list[tuple[str, int]]) -
                 "index": body.index,
                 "pos": data.qpos[body.trunk : body.trunk + 3].tolist(),
                 "quat": data.qpos[body.trunk + 3 : body.trunk + 7].tolist(),
+                # every part's world pose, [x, y, z, qw, qx, qy, qz] — what an AR twin draws (microduck-brain
+                # `/api/jumeau`, Quest « Jumeau » mode)
+                "parts": {
+                    name: [round(v, 5) for v in data.xpos[b].tolist() + data.xquat[b].tolist()]
+                    for name, b in body.parts
+                },
             }
             for body in world.bodies
         ]
@@ -475,7 +489,7 @@ def write_groundtruth(world: World, path: str, targets: list[tuple[str, int]]) -
         now = float(data.time)
     tmp = path + ".tmp"
     with open(tmp, "w") as handle:
-        json.dump({"t": now, "ducks": ducks, "bodies": bodies}, handle)
+        json.dump({"t": now, "scene": getattr(world, "scene_name", None), "ducks": ducks, "bodies": bodies}, handle)
     os.replace(tmp, path)
 
 
@@ -509,6 +523,22 @@ def apply_control(world: World, path: str) -> None:
             data.qpos[qpos_adr : qpos_adr + 3] = position
             data.qpos[qpos_adr + 3 : qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
             data.qvel[dof_adr : dof_adr + 6] = 0.0
+        # `{"throw": {"testball": {"pos": [x, y, z], "vel": [vx, vy, vz]}}}` launches it (the AR twin's controller
+        # throws a ball the simulated duck then sees and plays with).
+        for name, spec in (command.get("throw") or {}).items():
+            body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+            if body_id < 0 or model.body_jntnum[body_id] < 1 or not isinstance(spec, dict):
+                continue
+            joint = int(model.body_jntadr[body_id])
+            if model.jnt_type[joint] != mujoco.mjtJoint.mjJNT_FREE:
+                continue
+            qpos_adr, dof_adr = int(model.jnt_qposadr[joint]), int(model.jnt_dofadr[joint])
+            data.qpos[qpos_adr : qpos_adr + 3] = [float(v) for v in spec["pos"][:3]]
+            data.qpos[qpos_adr + 3 : qpos_adr + 7] = [1.0, 0.0, 0.0, 0.0]
+            data.qvel[dof_adr : dof_adr + 6] = 0.0
+            # capped: a flick of the wrist, not a cannon (a 3.5 cm ball at 10 m/s goes through thin walls)
+            vel = np.clip(np.array([float(v) for v in (spec.get("vel") or [0, 0, 0])[:3]]), -6.0, 6.0)
+            data.qvel[dof_adr : dof_adr + 3] = vel
         # `{"teleport_duck": [{"index": 0, "pos": [x, y], "yaw": rad}]}` moves a duck's trunk (height and
         # joints kept, velocity zeroed, upright) so a long series of trials can start from the same
         # spot instead of wandering into a wall.
@@ -566,10 +596,12 @@ def run(world: World, headless: bool) -> None:
     # The cameras, at their own rate — slower than the viewer and far slower than physics.
     eyes = [b for b in world.bodies if b.camera is not None]
     passes_per_eye = max(1, round((1.0 / CAMERA_FPS) / period))
-    # Ground-truth tap (fork addition, opt-in): true trunk/object poses every 0.1 s of world time.
+    # Ground-truth tap (fork addition, opt-in): true trunk/part/object poses, 10 times a second by default.
     gt_path = os.environ.get("DUCK_SIM_GROUNDTRUTH", "")
     gt_targets = groundtruth_targets(world) if gt_path else []
-    passes_per_gt = max(1, round(0.1 / period))
+    # 10 Hz by default; the AR twin wants ~30 (`DUCK_SIM_GT_HZ`, set by microduck-brain's start-duck.sh)
+    gt_hz = min(60.0, max(1.0, float(os.environ.get("DUCK_SIM_GT_HZ", "10") or 10)))
+    passes_per_gt = max(1, round((1.0 / gt_hz) / period))
     control_path = os.environ.get("DUCK_SIM_CONTROL", "")
     if control_path:
         print(f"== control file {control_path} (teleport objects)", flush=True)
