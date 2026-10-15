@@ -136,6 +136,7 @@ def make_microduck_ball_kick_env_cfg(
     ball_noise_xy: float | tuple = BALL_POS_NOISE_XY,
     ball_target_speed: float = BALL_TARGET_SPEED,
     overshoot_weight: float = -4.0,
+    forward_velocity_weight: float = 12.0,
 ) -> ManagerBasedRlEnvCfg:
     """Create the Microduck BallKick environment configuration.
 
@@ -243,7 +244,7 @@ def make_microduck_ball_kick_env_cfg(
     # (net reward only hits 0 at ~1.0 m/s, 4× the target).
     cfg.rewards["ball_forward_velocity"] = RewardTermCfg(
         func=microduck_mdp.ball_forward_velocity,
-        weight=12.0,
+        weight=forward_velocity_weight,
         params={"asset_name": "ball", "max_speed": ball_target_speed},
     )
     cfg.rewards["ball_speed_overshoot"] = RewardTermCfg(
@@ -687,10 +688,24 @@ def make_tolerant_kick_rl_cfg(kick_foot: str, prefix: str = "ball_kick_tol") -> 
 
 
 # ── Fork: "passe" (gentle pass to the cat / a person) ─────────────────────────
-# Same wide placement DR as the tolerant kick, much lower target speed. With the
-# default weights (+12 capped, -4 overshoot) the tolerant kick at iter 1250
-# struck at 1.5-2.9 m/s for a 1.0 target: per step, reward stays positive up to
-# v = T * (1 + 12/4) and a harder kick rolls longer. Here the overshoot slope is
-# -10: net per-step reward reaches 0 at v = T * (1 + 12/10) = 1.1 m/s.
+# Same wide placement DR as the tolerant kick, much lower target speed.
+#
+# BUG FOUND 2026-10-15 (first passe runs, both feet): ball_forward_velocity's
+# weight was left hardcoded at 12.0 while the target was halved to 0.5. Since
+# that reward is CAPPED at the target (see ball_forward_velocity's docstring),
+# halving the target without rescaling the weight halves the at-target payoff
+# too (12*0.5=6 instead of 12) — while the kick's cost (support-foot anti-hop,
+# transient pose/upright deviation) stays the same as the full-power kick. That
+# shrinks the margin that makes kicking worth it at all; the left-foot run
+# collapsed to never touching the ball by iter 2999 (it still kicked fine at
+# iter 1500), the right-foot run survived but only ever grazed the ball
+# (~0.3 m/s in duck-sim, well under the 0.5 target).
+#
+# Fix: scale forward_velocity_weight by 1/target_speed so the at-target payoff
+# stays 12 regardless of target (matches the tolerant/original kick's margin).
+# Keep the overshoot slope at the same ratio to the (now-scaled) main weight as
+# the original design (-4/12 of it) rather than the old fixed -10, so "erring
+# hard" stays cheaper than "not kicking" at the same relative margin.
 PASSE_TARGET_SPEED = 0.5
-PASSE_OVERSHOOT_WEIGHT = -10.0
+PASSE_FORWARD_VELOCITY_WEIGHT = 12.0 / PASSE_TARGET_SPEED   # = 24.0
+PASSE_OVERSHOOT_WEIGHT = -PASSE_FORWARD_VELOCITY_WEIGHT / 3   # = -8.0 (same -4/12 ratio)
