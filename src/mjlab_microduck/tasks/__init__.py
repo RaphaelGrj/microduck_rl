@@ -320,3 +320,14 @@ for _foot, _suffix in (("right", "Right"), ("left", "Left")):
         rl_cfg=make_tolerant_kick_rl_cfg(_foot, prefix="ball_kick_passe"),
         runner_cls=MicroduckOnPolicyRunner,
     )
+
+# Fork: petit bond de joie (geste episodique par phase, voir microduck_hop_env_cfg).
+from .microduck_hop_env_cfg import MicroduckHopRlCfg, make_microduck_hop_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Hop-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_hop_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_hop_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckHopRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
