@@ -36,7 +36,7 @@ HOP_PERIOD = 2.4          # s, un bond par cycle
 EPISODE_LENGTH_S = 7.2    # 3 cycles
 STAND_Z = 0.115           # hauteur du tronc debout (mesuree)
 CROUCH_Z = 0.098          # prise d'elan
-HOP_DZ = 0.03             # gain de hauteur du tronc vise pendant le bond (m)
+HOP_DZ = 0.02             # gain de hauteur du tronc vise pendant le bond (m) ; 3 cm au premier jet, trop haut a decouvrir
 
 # Fenetres de phase
 CROUCH_START, CROUCH_END = 0.15, 0.30
@@ -104,10 +104,19 @@ def hop_crouch(env, command_name: str, std: float = 0.012,
     return _in(p, CROUCH_START, CROUCH_END) * torch.exp(-((_trunk_z(env, asset_cfg) - CROUCH_Z) / std) ** 2)
 
 
-def hop_air(env, command_name: str) -> torch.Tensor:
-    """Les deux pieds hors du sol pendant la fenetre de bond."""
+def _high_enough(env, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """0 -> 1 quand le tronc passe de (debout - 1 cm) a debout : un vrai bond ne se fait pas ventre au sol.
+
+    Premier pilote (2026-10-16) : la politique avait trouve la faille « se laisser tomber sur le ventre, pieds
+    replies » (tronc a 3,6 cm, pieds sans contact = « en l'air » pour le capteur, inclinaison nulle)."""
+    return torch.clamp((_trunk_z(env, asset_cfg) - (STAND_Z - 0.01)) / 0.01, 0.0, 1.0)
+
+
+def hop_air(env, command_name: str,
+            asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Les deux pieds hors du sol pendant la fenetre de bond, tronc a hauteur debout au moins."""
     p = _phase(env, command_name)
-    return _in(p, AIR_START, AIR_END) * _both_feet_off(env)
+    return _in(p, AIR_START, AIR_END) * _both_feet_off(env) * _high_enough(env, asset_cfg)
 
 
 def hop_height(env, command_name: str,
@@ -116,6 +125,25 @@ def hop_height(env, command_name: str,
     p = _phase(env, command_name)
     gain = torch.clamp((_trunk_z(env, asset_cfg) - STAND_Z) / HOP_DZ, 0.0, 1.0)
     return _in(p, AIR_START, AIR_END) * _both_feet_off(env) * gain
+
+
+def hop_launch(env, command_name: str, vz_full: float = 0.4,
+               asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Amorce de l'elan : paye la vitesse VERTICALE montante du tronc pendant la fenetre de bond (0 -> 1 jusqu'a
+    vz_full m/s). Pilote v2 (2026-10-16) : sans gradient vers le haut, la politique s'accroupit puis reste a 9,4 cm
+    (hop_air = 0, hop_height = 0). Meme logique que rise_bootstrap du sitstand : un but sans gradient a vitesse nulle
+    n'est jamais decouvert."""
+    p = _phase(env, command_name)
+    vz = torch.nan_to_num(env.scene[asset_cfg.name].data.root_link_lin_vel_w[:, 2], nan=0.0)
+    return _in(p, CROUCH_END - 0.05, AIR_END) * torch.clamp(vz / vz_full, 0.0, 1.0)
+
+
+def hop_low_penalty(env, floor_z: float = 0.085,
+                    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Penalite (negative, poids POSITIF) tant que le tronc est sous floor_z, dans TOUTES les phases :
+    l'accroupissement de prise d'elan descend a ~9,5 cm, jamais plus bas. Proportionnelle au deficit."""
+    z = _trunk_z(env, asset_cfg)
+    return -torch.clamp((floor_z - z) / 0.05, 0.0, 1.0)
 
 
 def hop_air_penalty(env, command_name: str) -> torch.Tensor:
@@ -183,7 +211,9 @@ def make_microduck_hop_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["hop_crouch"] = RewardTermCfg(func=hop_crouch, weight=2.0, params=dict(c))
     cfg.rewards["hop_air"] = RewardTermCfg(func=hop_air, weight=6.0, params=dict(c))
     cfg.rewards["hop_height"] = RewardTermCfg(func=hop_height, weight=4.0, params=dict(c))
-    cfg.rewards["hop_air_penalty"] = RewardTermCfg(func=hop_air_penalty, weight=3.0, params=dict(c))
+    cfg.rewards["hop_launch"] = RewardTermCfg(func=hop_launch, weight=4.0, params=dict(c))
+    cfg.rewards["hop_low_penalty"] =RewardTermCfg(func=hop_low_penalty, weight=6.0)
+    cfg.rewards["hop_air_penalty"] =RewardTermCfg(func=hop_air_penalty, weight=3.0, params=dict(c))
     cfg.rewards["hop_land_upright"] = RewardTermCfg(func=hop_land_upright, weight=3.0, params=dict(c))
     return cfg
 
