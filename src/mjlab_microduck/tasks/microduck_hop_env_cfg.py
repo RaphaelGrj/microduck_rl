@@ -163,6 +163,22 @@ def hop_land_upright(env, command_name: str,
     return _in(p, AIR_END, LAND_END + 0.1) * torch.clamp(cos_tilt, 0.0, 1.0) * torch.exp(-(v / 0.15) ** 2)
 
 
+def hop_tilt_penalty(env,
+                     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Penalite (negative, poids POSITIF) proportionnelle a l'inclinaison du tronc (1 - cos), dans TOUTES les phases.
+    Pilote v3 (2026-10-18) : en vol gravite_z = -0,44 (corps tres penche) et ~30 deg d'inclinaison gardee au repos."""
+    quat = env.scene[asset_cfg.name].data.root_link_quat_w
+    cos_tilt = torch.nan_to_num(1.0 - 2.0 * (quat[:, 1] ** 2 + quat[:, 2] ** 2), nan=1.0)
+    return -(1.0 - torch.clamp(cos_tilt, -1.0, 1.0))
+
+
+def hop_mid_contact_penalty(env, command_name: str) -> torch.Tensor:
+    """Penalite (negative, poids POSITIF) si un pied touche le sol au milieu de la fenetre de bond : un seul bond
+    propre, sans rebond (pilote v3 : retouche le sol vers phi 0,42 puis rebondit)."""
+    p = _phase(env, command_name)
+    return -_in(p, 0.38, 0.48) * (1.0 - _both_feet_off(env))
+
+
 # --------------------------------------------------------------------------- #
 # Configuration                                                                #
 # --------------------------------------------------------------------------- #
@@ -215,6 +231,8 @@ def make_microduck_hop_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["hop_low_penalty"] =RewardTermCfg(func=hop_low_penalty, weight=6.0)
     cfg.rewards["hop_air_penalty"] =RewardTermCfg(func=hop_air_penalty, weight=3.0, params=dict(c))
     cfg.rewards["hop_land_upright"] = RewardTermCfg(func=hop_land_upright, weight=3.0, params=dict(c))
+    cfg.rewards["hop_tilt_penalty"] = RewardTermCfg(func=hop_tilt_penalty, weight=5.0)
+    cfg.rewards["hop_mid_contact_penalty"] = RewardTermCfg(func=hop_mid_contact_penalty, weight=3.0, params=dict(c))
     return cfg
 
 
