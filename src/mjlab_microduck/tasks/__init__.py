@@ -331,3 +331,14 @@ register_mjlab_task(
     rl_cfg=MicroduckHopRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: secousse du corps / s ebrouer (geste episodique par phase, voir microduck_shake_env_cfg).
+from .microduck_shake_env_cfg import MicroduckShakeRlCfg, make_microduck_shake_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Shake-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_shake_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_shake_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckShakeRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)

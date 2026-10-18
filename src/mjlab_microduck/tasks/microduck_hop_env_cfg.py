@@ -83,7 +83,7 @@ def hop_rest_pose(env, command_name: str, std: float = 0.5,
     return w * torch.exp(-((qpos - q0) / std) ** 2).mean(dim=-1)
 
 
-def hop_rest_height(env, command_name: str, std: float = 0.02,
+def hop_rest_height(env, command_name: str, std: float = 0.01,
                     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
     p = _phase(env, command_name)
     w = 1.0 - _in(p, CROUCH_START, LAND_END)
@@ -222,7 +222,7 @@ def make_microduck_hop_env_cfg(play: bool = False, rough: bool = False):
 
     c = {"command_name": "twist"}
     cfg.rewards["hop_rest_pose"] = RewardTermCfg(func=hop_rest_pose, weight=3.0, params=dict(c))
-    cfg.rewards["hop_rest_height"] = RewardTermCfg(func=hop_rest_height, weight=2.0, params=dict(c))
+    cfg.rewards["hop_rest_height"] = RewardTermCfg(func=hop_rest_height, weight=3.0, params=dict(c))
     cfg.rewards["hop_rest_still"] = RewardTermCfg(func=hop_rest_still, weight=1.5, params=dict(c))
     cfg.rewards["hop_crouch"] = RewardTermCfg(func=hop_crouch, weight=2.0, params=dict(c))
     cfg.rewards["hop_air"] = RewardTermCfg(func=hop_air, weight=6.0, params=dict(c))
@@ -230,7 +230,7 @@ def make_microduck_hop_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["hop_launch"] = RewardTermCfg(func=hop_launch, weight=4.0, params=dict(c))
     cfg.rewards["hop_low_penalty"] =RewardTermCfg(func=hop_low_penalty, weight=6.0)
     cfg.rewards["hop_air_penalty"] =RewardTermCfg(func=hop_air_penalty, weight=3.0, params=dict(c))
-    cfg.rewards["hop_land_upright"] = RewardTermCfg(func=hop_land_upright, weight=3.0, params=dict(c))
+    cfg.rewards["hop_land_upright"] = RewardTermCfg(func=hop_land_upright, weight=4.0, params=dict(c))
     cfg.rewards["hop_tilt_penalty"] = RewardTermCfg(func=hop_tilt_penalty, weight=5.0)
     cfg.rewards["hop_mid_contact_penalty"] = RewardTermCfg(func=hop_mid_contact_penalty, weight=3.0, params=dict(c))
     return cfg
