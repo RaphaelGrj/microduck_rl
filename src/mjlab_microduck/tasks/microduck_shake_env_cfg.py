@@ -24,6 +24,7 @@ import torch
 from mjlab.managers import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.rl import RslRlOnPolicyRunnerCfg
+from mjlab.utils.lab_api.math import wrap_to_pi
 
 from mjlab_microduck.tasks.microduck_hop_env_cfg import (
     CROUCH_START,
@@ -38,6 +39,7 @@ from mjlab_microduck.tasks.microduck_hop_env_cfg import (
     make_microduck_hop_env_cfg,
 )
 from mjlab_microduck.tasks.microduck_sitstand_env_cfg import MicroduckSitStandRlCfg
+from mjlab_microduck.tasks.mdp import ShakePhaseCommandCfg
 
 SHAKE_PERIOD = 2.0        # s
 EPISODE_LENGTH_S = 6.0    # 3 cycles
@@ -82,17 +84,32 @@ def shake_drift(env, command_name: str, vel_std: float = 0.1,
     return _in(p, SHAKE_START, SHAKE_END) * torch.exp(-(v / vel_std) ** 2)
 
 
+def shake_yaw_lock(env, command_name: str, std: float = 0.6,
+                   asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Cap (yaw) proche de celui du debut de l'episode (phase 0, debout) pendant le repos
+    qui suit chaque secousse : corrige la derive mesuree en duck-sim (le canard tournait sur
+    place au fil des cycles au lieu de revenir dans son axe). Actif hors fenetre de secousse
+    (phase SHAKE_END..1.0) pour laisser la secousse elle-meme libre d'osciller."""
+    p = _phase(env, command_name)
+    term = env.command_manager.get_term(command_name)
+    yaw = env.scene[asset_cfg.name].data.heading_w
+    err = wrap_to_pi(yaw - term.yaw0)
+    return (1.0 - _in(p, SHAKE_START, SHAKE_END)) * torch.exp(-(err / std) ** 2)
+
+
 def make_microduck_shake_env_cfg(play: bool = False, rough: bool = False):
     cfg = make_microduck_hop_env_cfg(play=play, rough=rough)
     cfg.episode_length_s = EPISODE_LENGTH_S
     for name in _HOP_ONLY_REWARDS:
         cfg.rewards.pop(name, None)
-    cfg.commands["twist"].period = SHAKE_PERIOD
+    base_fields = {k: v for k, v in vars(cfg.commands["twist"]).items() if k != "class_type"}
+    cfg.commands["twist"] = ShakePhaseCommandCfg(**{**base_fields, "period": SHAKE_PERIOD})
 
     c = {"command_name": "twist"}
     cfg.rewards["shake_track"] = RewardTermCfg(func=shake_track, weight=4.0, params=dict(c))
     cfg.rewards["shake_feet_penalty"] = RewardTermCfg(func=shake_feet_penalty, weight=3.0, params=dict(c))
     cfg.rewards["shake_drift"] = RewardTermCfg(func=shake_drift, weight=1.5, params=dict(c))
+    cfg.rewards["shake_yaw_lock"] = RewardTermCfg(func=shake_yaw_lock, weight=3.0, params=dict(c))
     return cfg
 
 

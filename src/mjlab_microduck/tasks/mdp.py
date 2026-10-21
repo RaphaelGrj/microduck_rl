@@ -5260,6 +5260,40 @@ class GroundPickPhaseCommandCfg(UniformVelocityCommandCfg):
         return GroundPickPhaseCommand(self, env)
 
 
+class ShakePhaseCommand(GroundPickPhaseCommand):
+    """GroundPickPhaseCommand qui retient en plus le cap (yaw) au debut de l'episode
+    (phase 0, position de depart debout), pour une recompense de retour au cap
+    (voir shake_yaw_lock dans microduck_shake_env_cfg.py) : le Shake doit tourner sur
+    place et revenir, pas deriver en lacet au fil des cycles."""
+
+    def __init__(self, cfg, env: ManagerBasedRlEnv):
+        super().__init__(cfg, env)
+        self._yaw0 = torch.zeros(self.num_envs, device=self.device)
+
+    @property
+    def yaw0(self) -> torch.Tensor:
+        return self._yaw0
+
+    def reset(self, env_ids: torch.Tensor | None) -> dict:
+        result = super().reset(env_ids)
+        if env_ids is not None and len(env_ids) > 0:
+            self._yaw0[env_ids] = self.robot.data.heading_w[env_ids]
+        return result
+
+
+@_dataclass(kw_only=True)
+class ShakePhaseCommandCfg(GroundPickPhaseCommandCfg):
+    """Cfg pour ShakePhaseCommand. GroundPickPhaseCommandCfg.build() instancie
+    GroundPickPhaseCommand en dur (ignore class_type) : il faut surcharger build()
+    pour que le Shake obtienne vraiment un ShakePhaseCommand, pas seulement changer
+    le champ class_type (qui ne sert alors plus qu'a l'introspection)."""
+
+    class_type: type = ShakePhaseCommand
+
+    def build(self, env: ManagerBasedRlEnv) -> "ShakePhaseCommand":
+        return ShakePhaseCommand(self, env)
+
+
 # --------------------------------------------------------------------------- #
 # Unified pose command machinery                                               #
 # --------------------------------------------------------------------------- #
