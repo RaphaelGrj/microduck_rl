@@ -74,7 +74,7 @@ def bow_drift(env, command_name: str, vel_std: float = 0.1,
     return _in(p, BOW_START, BOW_END) * torch.exp(-(v / vel_std) ** 2)
 
 
-def bow_rest_upright(env, command_name: str, std: float = 0.1,
+def bow_rest_upright(env, command_name: str, std: float = 0.3,
                      asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Tronc droit (tangage ~ 0) hors de la fenetre de salut : le canard se redresse completement."""
     p = _phase(env, command_name)
@@ -94,7 +94,7 @@ def make_microduck_bow_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["bow_feet_penalty"] = RewardTermCfg(func=bow_feet_penalty, weight=3.0, params=dict(c))
     cfg.rewards["bow_roll_penalty"] = RewardTermCfg(func=bow_roll_penalty, weight=3.0)
     cfg.rewards["bow_drift"] = RewardTermCfg(func=bow_drift, weight=1.5, params=dict(c))
-    cfg.rewards["bow_rest_upright"] = RewardTermCfg(func=bow_rest_upright, weight=3.0, params=dict(c))
+    cfg.rewards["bow_rest_upright"] = RewardTermCfg(func=bow_rest_upright, weight=8.0, params=dict(c))
     return cfg
 
 
