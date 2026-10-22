@@ -342,3 +342,14 @@ register_mjlab_task(
     rl_cfg=MicroduckShakeRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: salut marque (geste episodique par phase, voir microduck_bow_env_cfg).
+from .microduck_bow_env_cfg import MicroduckBowRlCfg, make_microduck_bow_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Bow-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_bow_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_bow_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckBowRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
