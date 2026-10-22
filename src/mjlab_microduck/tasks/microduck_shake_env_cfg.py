@@ -60,7 +60,7 @@ def _feet_down(env) -> torch.Tensor:
     return per_foot.all(dim=-1).float()
 
 
-def shake_track(env, command_name: str, std: float = 1.5,
+def shake_track(env, command_name: str, std: float = 1.0,
                 asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Vitesse de lacet du tronc proche de la cible sinusoidale pendant la fenetre de secousse."""
     p = _phase(env, command_name)
@@ -84,7 +84,7 @@ def shake_drift(env, command_name: str, vel_std: float = 0.1,
     return _in(p, SHAKE_START, SHAKE_END) * torch.exp(-(v / vel_std) ** 2)
 
 
-def shake_yaw_lock(env, command_name: str, std: float = 0.6,
+def shake_yaw_lock(env, command_name: str, std: float = 0.5,
                    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Cap (yaw) proche de celui du debut de l'episode (phase 0, debout) pendant le repos
     qui suit chaque secousse : corrige la derive mesuree en duck-sim (le canard tournait sur
@@ -94,7 +94,8 @@ def shake_yaw_lock(env, command_name: str, std: float = 0.6,
     term = env.command_manager.get_term(command_name)
     yaw = env.scene[asset_cfg.name].data.heading_w
     err = wrap_to_pi(yaw - term.yaw0)
-    return (1.0 - _in(p, SHAKE_START, SHAKE_END)) * torch.exp(-(err / std) ** 2)
+    # v3 : actif sur TOUT le cycle (la v2, hors fenetre seulement, restait sans effet)
+    return torch.exp(-(err / std) ** 2)
 
 
 def make_microduck_shake_env_cfg(play: bool = False, rough: bool = False):
@@ -109,7 +110,7 @@ def make_microduck_shake_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["shake_track"] = RewardTermCfg(func=shake_track, weight=4.0, params=dict(c))
     cfg.rewards["shake_feet_penalty"] = RewardTermCfg(func=shake_feet_penalty, weight=3.0, params=dict(c))
     cfg.rewards["shake_drift"] = RewardTermCfg(func=shake_drift, weight=1.5, params=dict(c))
-    cfg.rewards["shake_yaw_lock"] = RewardTermCfg(func=shake_yaw_lock, weight=3.0, params=dict(c))
+    cfg.rewards["shake_yaw_lock"] = RewardTermCfg(func=shake_yaw_lock, weight=8.0, params=dict(c))
     return cfg
 
 
