@@ -386,3 +386,14 @@ register_mjlab_task(
     rl_cfg=MicroduckStompRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: pirouette (un tour sur place, commande constante -> skill, voir microduck_pirouette_env_cfg).
+from .microduck_pirouette_env_cfg import MicroduckPirouetteRlCfg, make_microduck_pirouette_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Pirouette-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_pirouette_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_pirouette_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckPirouetteRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)

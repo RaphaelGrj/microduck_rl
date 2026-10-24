@@ -5295,6 +5295,45 @@ class ShakePhaseCommandCfg(GroundPickPhaseCommandCfg):
 
 
 # --------------------------------------------------------------------------- #
+# Commande « tour puis arret » (Pirouette)                                     #
+# --------------------------------------------------------------------------- #
+
+
+class SpinStopCommand(GroundPickPhaseCommand):
+    """Commande a deux etats, comme la livre le runtime pour un skill avec unwind : des ZEROS pendant `period` secondes
+    (le skill tourne), puis le drapeau [1, 0, 0] (le twist `idle` du manifest, que le demon envoie pendant `unwind_s`).
+    La politique n'a pas d'horloge : ce drapeau est son seul signal pour freiner avant la remise de main."""
+
+    def __init__(self, cfg, env: ManagerBasedRlEnv):
+        super().__init__(cfg, env)
+        self._tt = torch.zeros(self.num_envs, device=self.device)
+        self._t_spin = float(getattr(cfg, "period", 2.0))
+
+    def compute(self, dt: float) -> None:
+        self._tt += dt
+        self.vel_command_b[:, 0] = (self._tt >= self._t_spin).float()
+        self.vel_command_b[:, 1] = 0.0
+        self.vel_command_b[:, 2] = 0.0
+
+    def reset(self, env_ids: torch.Tensor | None) -> dict:
+        if env_ids is not None and len(env_ids) > 0:
+            self._tt[env_ids] = 0.0
+            self.vel_command_b[env_ids, :] = 0.0
+        return {}
+
+
+@_dataclass(kw_only=True)
+class SpinStopCommandCfg(GroundPickPhaseCommandCfg):
+    """Cfg pour SpinStopCommand (`period` = duree du tour en s). build() surcharge pour la meme raison que
+    ShakePhaseCommandCfg : GroundPickPhaseCommandCfg.build() instancie sa classe en dur."""
+
+    class_type: type = SpinStopCommand
+
+    def build(self, env: ManagerBasedRlEnv) -> "SpinStopCommand":
+        return SpinStopCommand(self, env)
+
+
+# --------------------------------------------------------------------------- #
 # Unified pose command machinery                                               #
 # --------------------------------------------------------------------------- #
 #
