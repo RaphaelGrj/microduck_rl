@@ -397,3 +397,23 @@ register_mjlab_task(
     rl_cfg=MicroduckPirouetteRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: tir tolerant AVEC retour debout en fin d episode (voir kick_stand_end dans microduck_ball_kick_env_cfg).
+from .microduck_ball_kick_env_cfg import STAND_END_WEIGHT
+
+for _foot, _suffix in (("right", "Right"), ("left", "Left")):
+    _kw_up = {
+        "kick_foot": _foot,
+        "ball_offset_x": TOLERANT_BALL_OFFSET_X,
+        "ball_noise_xy": TOLERANT_BALL_NOISE_XY,
+        "stand_end_weight": STAND_END_WEIGHT,
+    }
+    register_mjlab_task(
+        task_id=f"Mjlab-BallKickTolerantUp-Flat-Backlash-MicroDuck-{_suffix}",
+        env_cfg=make_backlash_variant(make_microduck_ball_kick_env_cfg(**_kw_up), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(
+            make_microduck_ball_kick_env_cfg(play=True, **_kw_up), _BL_GROUNDCONTACT
+        ),
+        rl_cfg=make_tolerant_kick_rl_cfg(_foot, prefix="ball_kick_tolup"),
+        runner_cls=MicroduckOnPolicyRunner,
+    )

@@ -34,6 +34,8 @@ at the same relative strength.
 import math
 from copy import deepcopy
 
+import torch
+
 # ── Kicking foot: "right" or "left" ───────────────────────────────────────────
 # Flips the ball spawn side and the support-foot (anti-hop) sensor. Everything
 # else is left/right symmetric (HOME pose has mirrored signs). Train the two
@@ -129,6 +131,20 @@ from mjlab_microduck.tasks.microduck_velocity_env_cfg import HEAD_BODY_NAMES
 from mjlab_microduck.tasks.symmetry import PpoWithSymmetryCfg, SYMMETRY_CFG
 
 
+def kick_stand_end(env, from_s: float = 2.5, std: float = 0.02,
+                   asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Retour debout en fin d'episode (fork, 2026-10-24) : gaussienne etroite sur la hauteur du tronc, active apres from_s.
+    Le tir droit tolerant (run du 2026-10-04) restait accroupi a 5,6 cm jusqu'a la fin de l'episode : la recompense
+    height_stand (std 0,04, poids 1) ne vaut que 0,11 a cette hauteur, trop faible face au gain du tir."""
+    asset = env.scene[asset_cfg.name]
+    z = torch.nan_to_num(asset.data.root_link_pos_w[:, 2] - env.scene.terrain.env_origins[:, 2], nan=0.0)
+    t = env.episode_length_buf.float() * env.step_dt
+    # v1 (gaussienne seule, std 0,02) : exp(-9) = 1e-4 a 5,6 cm -> AUCUN gradient, stand_end resta a 0,0008 sur 300
+    # iterations. v2 : rampe lineaire de 4 cm a STAND_Z - 1 cm (gradient partout) + gaussienne fine pour la precision.
+    ramp = torch.clamp((z - 0.04) / (STAND_Z - 0.01 - 0.04), 0.0, 1.0)
+    return (t >= from_s).float() * (0.5 * ramp + 0.5 * torch.exp(-((z - STAND_Z) / std) ** 2))
+
+
 def make_microduck_ball_kick_env_cfg(
     play: bool = False,
     kick_foot: str | None = None,
@@ -137,6 +153,7 @@ def make_microduck_ball_kick_env_cfg(
     ball_target_speed: float = BALL_TARGET_SPEED,
     overshoot_weight: float = -4.0,
     forward_velocity_weight: float = 12.0,
+    stand_end_weight: float = 0.0,
 ) -> ManagerBasedRlEnvCfg:
     """Create the Microduck BallKick environment configuration.
 
@@ -303,6 +320,9 @@ def make_microduck_ball_kick_env_cfg(
             "asset_cfg":     SceneEntityCfg("robot", body_names=("trunk_base",)),
         },
     )
+
+    if stand_end_weight:
+        cfg.rewards["stand_end"] = RewardTermCfg(func=kick_stand_end, weight=stand_end_weight)
 
     # ── Sim2real regularisers — velocity parity (see standup env rationale) ──
     cfg.rewards["action_rate_l2"].weight = -0.1  # stage-0; curriculum ramps to -1.0
@@ -709,3 +729,9 @@ def make_tolerant_kick_rl_cfg(kick_foot: str, prefix: str = "ball_kick_tol") -> 
 PASSE_TARGET_SPEED = 0.5
 PASSE_FORWARD_VELOCITY_WEIGHT = 12.0 / PASSE_TARGET_SPEED   # = 24.0
 PASSE_OVERSHOOT_WEIGHT = -PASSE_FORWARD_VELOCITY_WEIGHT / 3   # = -8.0 (same -4/12 ratio)
+
+
+# ── Fork: "tolerant + retour debout" (2026-10-24) ─────────────────────────────
+# Le tir droit tolerant restait accroupi (5,6 cm, 1 deg) jusqu a la fin de l episode. Meme tache, plus la recompense
+# kick_stand_end (hauteur debout apres STAND_END_FROM_S) ; on repart du checkpoint 2999 du run du 2026-10-04.
+STAND_END_WEIGHT = 6.0
