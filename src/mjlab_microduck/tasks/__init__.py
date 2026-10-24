@@ -364,3 +364,14 @@ register_mjlab_task(
     rl_cfg=MicroduckStartleRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: frisson (tremblement de roulis, commande constante -> skill, voir microduck_shiver_env_cfg).
+from .microduck_shiver_env_cfg import MicroduckShiverRlCfg, make_microduck_shiver_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Shiver-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_shiver_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_shiver_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckShiverRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
