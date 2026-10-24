@@ -353,3 +353,14 @@ register_mjlab_task(
     rl_cfg=MicroduckBowRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: sursaut (geste episodique a commande CONSTANTE, donc publiable comme skill, voir microduck_startle_env_cfg).
+from .microduck_startle_env_cfg import MicroduckStartleRlCfg, make_microduck_startle_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Startle-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_startle_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_startle_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckStartleRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
