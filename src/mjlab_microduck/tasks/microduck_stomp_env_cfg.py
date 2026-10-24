@@ -56,7 +56,8 @@ def _update(env) -> None:
     prev = env._stomp_air.clone()
     env._stomp_air = torch.where(on, torch.zeros_like(prev), prev + env.step_dt)
     # repose : un pied qui etait en l'air depuis au moins MIN_AIR_S touche de nouveau le sol
-    env._stomp_touch = ((prev >= MIN_AIR_S) & on).any(dim=-1).float()
+    env._stomp_touch_each = ((prev >= MIN_AIR_S) & on).float()      # [envs, 2] : repose de chaque pied
+    env._stomp_touch = env._stomp_touch_each.amax(dim=-1)
 
 
 def _window(env) -> torch.Tensor:

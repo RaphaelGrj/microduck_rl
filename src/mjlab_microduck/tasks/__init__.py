@@ -417,3 +417,26 @@ for _foot, _suffix in (("right", "Right"), ("left", "Left")):
         rl_cfg=make_tolerant_kick_rl_cfg(_foot, prefix="ball_kick_tolup"),
         runner_cls=MicroduckOnPolicyRunner,
     )
+
+# Fork: gestes II — tape du pied, accroupissement curieux, pas de cote (voir microduck_gestes2_env_cfg).
+from .microduck_gestes2_env_cfg import (
+    MicroduckCrouchRlCfg,
+    MicroduckSidestepRlCfg,
+    MicroduckTapRlCfg,
+    make_microduck_crouch_env_cfg,
+    make_microduck_sidestep_env_cfg,
+    make_microduck_tap_env_cfg,
+)
+
+for _tid, _mk, _rl in (
+    ("Mjlab-Tap-Flat-Backlash-MicroDuck", make_microduck_tap_env_cfg, MicroduckTapRlCfg),
+    ("Mjlab-Crouch-Flat-Backlash-MicroDuck", make_microduck_crouch_env_cfg, MicroduckCrouchRlCfg),
+    ("Mjlab-Sidestep-Flat-Backlash-MicroDuck", make_microduck_sidestep_env_cfg, MicroduckSidestepRlCfg),
+):
+    register_mjlab_task(
+        task_id=_tid,
+        env_cfg=make_backlash_variant(_mk(), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(_mk(play=True), _BL_GROUNDCONTACT),
+        rl_cfg=_rl,
+        runner_cls=MicroduckOnPolicyRunner,
+    )
