@@ -149,6 +149,13 @@ def make_microduck_startle_env_cfg(play: bool = False, rough: bool = False):
     cfg.rewards["startle_rest_pose"] = RewardTermCfg(func=startle_rest_pose, weight=3.0)
     cfg.rewards["startle_rest_height"] = RewardTermCfg(func=startle_rest_height, weight=3.0)
     cfg.rewards["startle_rest_still"] = RewardTermCfg(func=startle_rest_still, weight=1.5)
+    # Cou/tete au neutre sur TOUT l'episode : pilote v2 (2026-10-24), rien ne retenait la tete (commande zeros, pas de
+    # recompense de tete) et elle s'affaissait vers l'avant des le milieu du geste (vu sur le rendu video).
+    cfg.rewards["startle_neck_home"] = RewardTermCfg(
+        func=microduck_mdp.pose_target_match,
+        weight=3.0,
+        params={"std": 0.3, "joint_indices": [5, 6, 7, 8], "target_overrides": None},
+    )
     return cfg
 
 
