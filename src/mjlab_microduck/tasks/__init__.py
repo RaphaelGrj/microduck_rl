@@ -375,3 +375,14 @@ register_mjlab_task(
     rl_cfg=MicroduckShiverRlCfg,
     runner_cls=MicroduckOnPolicyRunner,
 )
+
+# Fork: trepignement (pieds alternes sur place, commande constante -> skill, voir microduck_stomp_env_cfg).
+from .microduck_stomp_env_cfg import MicroduckStompRlCfg, make_microduck_stomp_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Stomp-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_stomp_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_stomp_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckStompRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
