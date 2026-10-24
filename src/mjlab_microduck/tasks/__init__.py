@@ -440,3 +440,23 @@ for _tid, _mk, _rl in (
         rl_cfg=_rl,
         runner_cls=MicroduckOnPolicyRunner,
     )
+
+# Fork: gestes III — etirement sur une jambe, arret theatral (voir microduck_gestes3_env_cfg).
+from .microduck_gestes3_env_cfg import (
+    MicroduckLegStretchRlCfg,
+    MicroduckStopTheatreRlCfg,
+    make_microduck_legstretch_env_cfg,
+    make_microduck_stoptheatre_env_cfg,
+)
+
+for _tid, _mk, _rl in (
+    ("Mjlab-LegStretch-Flat-Backlash-MicroDuck", make_microduck_legstretch_env_cfg, MicroduckLegStretchRlCfg),
+    ("Mjlab-StopTheatre-Flat-Backlash-MicroDuck", make_microduck_stoptheatre_env_cfg, MicroduckStopTheatreRlCfg),
+):
+    register_mjlab_task(
+        task_id=_tid,
+        env_cfg=make_backlash_variant(_mk(), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(_mk(play=True), _BL_GROUNDCONTACT),
+        rl_cfg=_rl,
+        runner_cls=MicroduckOnPolicyRunner,
+    )
