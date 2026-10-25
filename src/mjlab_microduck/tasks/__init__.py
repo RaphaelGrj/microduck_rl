@@ -421,6 +421,17 @@ register_mjlab_task(
     runner_cls=MicroduckOnPolicyRunner,
 )
 
+# Fork: sprint (course droite courte a 0,8 m/s, commande constante -> skill, voir microduck_sprint_env_cfg).
+from .microduck_sprint_env_cfg import MicroduckSprintRlCfg, make_microduck_sprint_env_cfg
+
+register_mjlab_task(
+    task_id="Mjlab-Sprint-Flat-Backlash-MicroDuck",
+    env_cfg=make_backlash_variant(make_microduck_sprint_env_cfg(), _BL_GROUNDCONTACT),
+    play_env_cfg=make_backlash_variant(make_microduck_sprint_env_cfg(play=True), _BL_GROUNDCONTACT),
+    rl_cfg=MicroduckSprintRlCfg,
+    runner_cls=MicroduckOnPolicyRunner,
+)
+
 # Fork: tir tolerant AVEC retour debout en fin d episode (voir kick_stand_end dans microduck_ball_kick_env_cfg).
 from .microduck_ball_kick_env_cfg import STAND_END_WEIGHT
 
