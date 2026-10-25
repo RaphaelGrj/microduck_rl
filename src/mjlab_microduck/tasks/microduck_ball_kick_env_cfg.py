@@ -153,6 +153,7 @@ def make_microduck_ball_kick_env_cfg(
     ball_target_speed: float = BALL_TARGET_SPEED,
     overshoot_weight: float = -4.0,
     forward_velocity_weight: float = 12.0,
+    lateral_weight: float = 0.0,
     stand_end_weight: float = 0.0,
 ) -> ManagerBasedRlEnvCfg:
     """Create the Microduck BallKick environment configuration.
@@ -269,6 +270,13 @@ def make_microduck_ball_kick_env_cfg(
         weight=overshoot_weight,
         params={"asset_name": "ball", "target_speed": ball_target_speed},
     )
+
+    if lateral_weight:
+        cfg.rewards["ball_lateral_speed"] = RewardTermCfg(
+            func=microduck_mdp.ball_lateral_speed_penalty,
+            weight=lateral_weight,
+            params={"asset_name": "ball"},
+        )
 
     # Support foot: binary +1 while the non-kicking foot touches the ground.
     # Always-on anti-hop — swinging the kicking leg is free, lifting the
@@ -735,3 +743,9 @@ PASSE_OVERSHOOT_WEIGHT = -PASSE_FORWARD_VELOCITY_WEIGHT / 3   # = -8.0 (same -4/
 # Le tir droit tolerant restait accroupi (5,6 cm, 1 deg) jusqu a la fin de l episode. Meme tache, plus la recompense
 # kick_stand_end (hauteur debout apres STAND_END_FROM_S) ; on repart du checkpoint 2999 du run du 2026-10-04.
 STAND_END_WEIGHT = 6.0
+
+
+# ── Fork: "passe directe" (2026-10-25) ────────────────────────────────────────
+# La passe douce part a +-15 deg de sa ligne selon la position de la balle (mesure duck-sim) : la vitesse laterale de la
+# balle est penalisee, au meme poids que la vitesse avant (un ecart de 15 deg a 0,5 m/s = 0,13 m/s lateral = -3,1/pas).
+PASSE_DIRECTE_LATERAL_WEIGHT = -PASSE_FORWARD_VELOCITY_WEIGHT

@@ -6112,6 +6112,24 @@ def ball_speed_overshoot_penalty(
     return over.clamp(0.0, max_penalty)
 
 
+def ball_lateral_speed_penalty(
+    env: ManagerBasedRlEnv,
+    asset_name: str = "ball",
+    max_penalty: float = 2.0,
+) -> torch.Tensor:
+    """Ball speed PERPENDICULAR to the per-env kick direction (linear, >= 0).
+
+    ball_forward_velocity pays 0 (no penalty) for lateral motion, so a pass that leaves the foot 20 degrees off its line
+    costs nothing: duck-sim measured the direction of the soft pass spreading over +-15 degrees with the ball position
+    (about +7 deg + 6.5 deg/cm of lateral offset). This term makes the direction part of the objective.
+    """
+    ball: Entity = env.scene[asset_name]
+    vel_xy = ball.data.root_link_lin_vel_w[:, :2]
+    d = _ball_kick_dir(env)
+    perp = vel_xy[:, 0] * d[:, 1] - vel_xy[:, 1] * d[:, 0]
+    return torch.nan_to_num(perp, nan=0.0).abs().clamp(0.0, max_penalty)
+
+
 def single_foot_grounded_reward(
     env: ManagerBasedRlEnv,
     sensor_name: str,

@@ -321,6 +321,29 @@ for _foot, _suffix in (("right", "Right"), ("left", "Left")):
         runner_cls=MicroduckOnPolicyRunner,
     )
 
+# Fork: passe directe (passe douce + penalite de vitesse laterale de la balle)
+from .microduck_ball_kick_env_cfg import PASSE_DIRECTE_LATERAL_WEIGHT
+
+for _foot, _suffix in (("right", "Right"), ("left", "Left")):
+    _kw_directe = {
+        "kick_foot": _foot,
+        "ball_offset_x": TOLERANT_BALL_OFFSET_X,
+        "ball_noise_xy": TOLERANT_BALL_NOISE_XY,
+        "ball_target_speed": PASSE_TARGET_SPEED,
+        "overshoot_weight": PASSE_OVERSHOOT_WEIGHT,
+        "forward_velocity_weight": PASSE_FORWARD_VELOCITY_WEIGHT,
+        "lateral_weight": PASSE_DIRECTE_LATERAL_WEIGHT,
+    }
+    register_mjlab_task(
+        task_id=f"Mjlab-BallKickPasseDirecte-Flat-Backlash-MicroDuck-{_suffix}",
+        env_cfg=make_backlash_variant(make_microduck_ball_kick_env_cfg(**_kw_directe), _BL_GROUNDCONTACT),
+        play_env_cfg=make_backlash_variant(
+            make_microduck_ball_kick_env_cfg(play=True, **_kw_directe), _BL_GROUNDCONTACT
+        ),
+        rl_cfg=make_tolerant_kick_rl_cfg(_foot, prefix="ball_kick_directe"),
+        runner_cls=MicroduckOnPolicyRunner,
+    )
+
 # Fork: petit bond de joie (geste episodique par phase, voir microduck_hop_env_cfg).
 from .microduck_hop_env_cfg import MicroduckHopRlCfg, make_microduck_hop_env_cfg
 
