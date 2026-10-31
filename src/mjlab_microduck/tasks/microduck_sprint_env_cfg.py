@@ -23,7 +23,7 @@ from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 from mjlab_microduck.tasks import mdp as microduck_mdp
 from mjlab_microduck.tasks.microduck_bow_env_cfg import bow_roll_penalty
 from mjlab_microduck.tasks.microduck_hop_env_cfg import hop_tilt_penalty
-from mjlab_microduck.tasks.microduck_hop_env_cfg import _LEG_JOINTS
+from mjlab_microduck.tasks.microduck_hop_env_cfg import _LEG_JOINTS, STAND_Z, _trunk_z
 from mjlab_microduck.tasks.microduck_pirouette_env_cfg import spin_height
 from mjlab_microduck.tasks.microduck_sitstand_env_cfg import MicroduckSitStandRlCfg
 from mjlab_microduck.tasks.microduck_startle_env_cfg import _t, make_microduck_startle_env_cfg
@@ -78,6 +78,11 @@ def sprint_rest_pose(env, std: float = 0.5,
     return (_t(env) >= REST_FROM).float() * torch.exp(-((qpos - q0) / std) ** 2).mean(dim=-1)
 
 
+def sprint_height_ramp(env, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=("trunk_base",))) -> torch.Tensor:
+    """Rampe lineaire vers la hauteur debout (gradient non nul meme tres bas : la gaussienne etroite etait plate)."""
+    return torch.clamp(1.0 - (STAND_Z - _trunk_z(env, asset_cfg)).abs() / 0.08, 0.0, 1.0)
+
+
 def make_microduck_sprint_env_cfg(play: bool = False, rough: bool = False):
     cfg = make_microduck_startle_env_cfg(play=play, rough=rough)
     cfg.episode_length_s = SPRINT_DURATION_S
@@ -97,12 +102,13 @@ def make_microduck_sprint_env_cfg(play: bool = False, rough: bool = False):
         **{**vars(base), "class_type": microduck_mdp.SpinStopCommand, "period": SPRINT_T, "randomize_phase": False}
     )
 
-    cfg.rewards["sprint_speed"] = RewardTermCfg(func=sprint_speed, weight=6.0)
+    cfg.rewards["sprint_speed"] = RewardTermCfg(func=sprint_speed, weight=10.0)
     cfg.rewards["sprint_overshoot_penalty"] = RewardTermCfg(func=sprint_overshoot_penalty, weight=3.0)
     cfg.rewards["sprint_heading_penalty"] = RewardTermCfg(func=sprint_heading_penalty, weight=1.5)
     cfg.rewards["sprint_tilt_penalty"] = RewardTermCfg(func=hop_tilt_penalty, weight=5.0)
     cfg.rewards["sprint_roll_penalty"] = RewardTermCfg(func=bow_roll_penalty, weight=1.5)
-    cfg.rewards["sprint_height"] = RewardTermCfg(func=spin_height, weight=2.0)
+    cfg.rewards["sprint_height"] = RewardTermCfg(func=spin_height, weight=4.0, params={"std": 0.04})
+    cfg.rewards["sprint_height_ramp"] = RewardTermCfg(func=sprint_height_ramp, weight=4.0)
     cfg.rewards["sprint_rest_still"] = RewardTermCfg(func=sprint_rest_still, weight=6.0)
     cfg.rewards["sprint_rest_pose"] = RewardTermCfg(func=sprint_rest_pose, weight=2.0)
     return cfg
